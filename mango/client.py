@@ -589,6 +589,7 @@ class BetterClient:
         self.blockhash_cache_duration: int = blockhash_cache_duration
         self.rpc_caller: CompoundRPCCaller = rpc_caller
         self.executor: Executor = ThreadPoolExecutor()
+        self.transaction_info = {}  # To save transaction info for later use
 
     @staticmethod
     def from_configuration(name: str, cluster_name: str, cluster_urls: typing.Sequence[ClusterUrlData], commitment: Commitment, skip_preflight: bool, encoding: str, blockhash_cache_duration: int, http_request_timeout: float, stale_data_pauses_before_retry: typing.Sequence[float], instruction_reporter: InstructionReporter) -> "BetterClient":
@@ -734,6 +735,11 @@ class BetterClient:
                     proper_commitment = self.commitment
                     proper_skip_preflight = self.skip_preflight
 
+
+                # To save transaction info for later use
+                blockhash_resp = self.get_recent_blockhash(Finalized)
+                recent_blockhash = self.compatible_client.parse_recent_blockhash(blockhash_resp)
+
                 proper_opts = TxOpts(preflight_commitment=proper_commitment,
                                      skip_confirmation=opts.skip_confirmation,
                                      skip_preflight=proper_skip_preflight)
@@ -748,6 +754,9 @@ class BetterClient:
                     self.executor.submit(tx_reporter.report_on_transaction)
                 else:
                     self._logger.error("Could not get status for stub signature")
+
+                # To save transaction info for later use
+                self.transaction_info[signature] = {transaction, signers, proper_opts, recent_blockhash}
 
                 return signature
             except BlockhashNotFoundException as blockhash_not_found_exception:
